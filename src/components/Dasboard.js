@@ -5,7 +5,7 @@ import Playlist from './Playlist';
 import axios from 'axios';
 
 const socket = io('http://localhost:5000', {
-  transports: ['websocket', 'polling'] // Ensure you use the correct transports
+  transports: ['websocket', 'polling'] 
 });
 
 const Dashboard = () => {

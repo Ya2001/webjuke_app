@@ -1,4 +1,3 @@
-// index.js
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
@@ -8,25 +7,54 @@ const axios = require('axios');
 const app = express();
 const server = http.createServer(app);
 
+// Configure Socket.IO with CORS options
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000", // This should allow requests from both http://localhost:3000 and http://localhost:3000/dashboard
+    origin: "http://localhost:3000", // Allow requests from this origin
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
+    credentials: true, // Allow cookies to be sent and received
   },
 });
 
+const socket = io('http://localhost:5000', {
+  transports: ['websocket'] // Ensure this is correctly configured
+});
+
+socket.on('connect', () => {
+  console.log('WebSocket connected');
+});
+
+socket.on('disconnect', () => {
+  console.log('WebSocket disconnected');
+});
+
+
 app.use(cors({
-  origin: "http://localhost:3000", // Allow requests from http://localhost:3000 and its paths
+  origin: "http://localhost:3000", // Allow requests from this origin
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
+  credentials: true, // Allow cookies to be sent and received
 }));
+
+app.use((req, res, next) => {
+  console.log('Request URL:', req.url);
+  next();
+});
+
 
 app.use(express.json());
 
-// Your search route
+app.set('spotifyAccessToken', 'your_access_token');
+
+
+
+app.get('/search', async (req, res) => {
+  const accessToken = process.env.SPOTIFY_ACCESS_TOKEN;
+  console.log('Access Token:', accessToken); 
+
+});
+
 app.get('/search', async (req, res) => {
   const accessToken = app.get('spotifyAccessToken');
   const query = req.query.query;
