@@ -1,70 +1,53 @@
-require('dotenv').config();
+// index.js
 const express = require('express');
 const cors = require('cors');
-const passport = require('passport');
-const SpotifyStrategy = require('passport-spotify').Strategy;
 const http = require('http');
 const socketIo = require('socket.io');
+const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
 
-app.use(cors());
+const io = socketIo(server, {
+  cors: {
+    origin: "http://localhost:3000", // This should allow requests from both http://localhost:3000 and http://localhost:3000/dashboard
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  },
+});
+
+app.use(cors({
+  origin: "http://localhost:3000", // Allow requests from http://localhost:3000 and its paths
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
+
 app.use(express.json());
-app.use(passport.initialize());
 
-passport.use(
-  new SpotifyStrategy(
-    {
-      clientID: process.env.SPOTIFY_CLIENT_ID,
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-      callbackURL: 'http://localhost:5000/auth/spotify/callback',
-    },
-    (accessToken, refreshToken, expires_in, profile, done) => {
-      // Here you would store the accessToken and profile in a database
-      return done(null, { profile, accessToken });
-    }
-  )
-);
+// Your search route
+app.get('/search', async (req, res) => {
+  const accessToken = app.get('spotifyAccessToken');
+  const query = req.query.query;
 
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
+  try {
+    const response = await axios.get('https://api.spotify.com/v1/search', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      params: {
+        q: query,
+        type: 'track',
+        limit: 10,
+      },
+    });
 
-passport.deserializeUser((obj, done) => {
-  done(null, obj);
-});
-
-app.get(
-  '/auth/spotify',
-  passport.authenticate('spotify', { scope: ['user-read-email', 'user-read-private'] })
-);
-
-app.get(
-  '/auth/spotify/callback',
-  passport.authenticate('spotify', { failureRedirect: '/' }),
-  (req, res) => {
-    // Successful authentication, redirect to frontend
-    res.redirect('http://localhost:3000/dashboard');
+    res.json(response.data.tracks.items);
+  } catch (error) {
+    console.error('Error searching tracks:', error);
+    res.status(500).send('Error searching tracks');
   }
-);
-
-// Socket.IO connection
-io.on('connection', (socket) => {
-  console.log('a user connected');
-
-  socket.on('joinSession', (sessionCode) => {
-    socket.join(sessionCode);
-  });
-
-  socket.on('queueSong', (data) => {
-    io.to(data.sessionCode).emit('updateQueue', data.song);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('user disconnected');
-  });
 });
 
 const PORT = process.env.PORT || 5000;
